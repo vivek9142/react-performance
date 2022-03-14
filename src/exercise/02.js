@@ -1,10 +1,29 @@
 // useMemo for expensive calculations
 // http://localhost:3000/isolated/exercise/02.js
 
+
+/* 2-b - web worker
+JS is a single threaded lang. all of the stuff loading data,etc
+These all stuff is  performed one thing at a time it can't happen all at same time
+so if loading time takes more than 16ms then the browser lock up and it can't update the screen
+so it has that janky experience. so we can setup the web worker for doing all these hard and 
+difficult steps so the main thread cannot do this hard and complicated work so this can offload this to this 
+process in the browser.
+
+the communication b/w web worker and js thread is async in nature 
+*/ 
+
 import * as React from 'react'
 import {useCombobox} from '../use-combobox'
-import {getItems} from '../filter-cities'
-import {useForceRerender} from '../utils'
+
+ /*2-b web worker commenting this using below line */ 
+//import {getItems} from '../filter-cities'
+
+import {getItems} from '../workerized-filter-cities'
+//2-b web workercommenting this line and adding useAsync
+// import {useForceRerender} from '../utils'
+
+import {useAsync, useForceRerender} from '../utils'
 
 function Menu({
   items,
@@ -58,11 +77,22 @@ function ListItem({
 
 function App() {
   const forceRerender = useForceRerender()
-  const [inputValue, setInputValue] = React.useState('')
+  const [inputValue, setInputValue] = React.useState('');
 
-  // 🐨 wrap getItems in a call to `React.useMemo`
-  const allItems = getItems(inputValue)
-  const items = allItems.slice(0, 100)
+  //2- b web worker commenting this - before code - 
+  //2-a using useMemo for reducing expensive calculations
+  // const allItems = React.useMemo(()=> getItems(inputValue),[inputValue]);
+
+  //added line following for web worker implementation
+  const {data: allItems, run} = useAsync({data: [], status: 'pending'})
+  React.useEffect(() => {
+    //when our app mounts it will run getItems async func and when it resolves it will rerender 
+    // due to useAsync func .
+    run(getItems(inputValue))
+  }, [inputValue, run]);
+
+
+  const items = allItems.slice(0, 100);
 
   const {
     selectedItem,

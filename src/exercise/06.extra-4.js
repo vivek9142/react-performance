@@ -11,7 +11,8 @@ import {
   updateGridCellState,
 } from '../utils'
 // 🐨 you're gonna need these:
-// import {RecoilRoot, useRecoilState, useRecoilCallback, atomFamily} from 'recoil'
+//4-6-a - import for recoil
+import {RecoilRoot, useRecoilState, useRecoilCallback, atomFamily} from 'recoil'
 
 const AppStateContext = React.createContext()
 
@@ -19,41 +20,49 @@ const initialGrid = Array.from({length: 100}, () =>
   Array.from({length: 100}, () => Math.random() * 100),
 )
 
-// 🐨 create an atomFamily called `cellAtoms` here where the
+// 4-6-c- -🐨 create an atomFamily called `cellAtoms` here where the
 // default callback function accepts an object with the
 // `row` and `column` and returns the value from the initialGrid
 // 💰 initialGrid[row][column]
+
+const cellAtoms =  atomFamily({
+  key:'cells',
+  default:({row,column}) => initialGrid[row][column],
+})
 
 // 💰 I'm going to give this hook to you as it's mostly here for our contrived
 // example purposes. Just comment this in when you're ready to use it.
 // Here's how it's used:
 // const updateGrid = useUpdateGrid()
 // then later: updateGrid({rows, columns})
-// function useUpdateGrid() {
-//   return useRecoilCallback(({set}) => ({rows, columns}) => {
-//     for (let row = 0; row < rows; row++) {
-//       for (let column = 0; column < columns; column++) {
-//         if (Math.random() > 0.7) {
-//           set(cellAtoms({row, column}), Math.random() * 100)
-//         }
-//       }
-//     }
-//   })
-// }
+
+//4-6-g- uncommenting this -
+function useUpdateGrid() {
+  return useRecoilCallback(({set}) => ({rows, columns}) => {
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        if (Math.random() > 0.7) {
+          set(cellAtoms({row, column}), Math.random() * 100)
+        }
+      }
+    }
+  })
+}
 
 function appReducer(state, action) {
   switch (action.type) {
     case 'TYPED_IN_DOG_INPUT': {
       return {...state, dogName: action.dogName}
     }
-    // 💣 we're going to use recoil to update the cell values, so delete this case
-    case 'UPDATE_GRID_CELL': {
-      return {...state, grid: updateGridCellState(state.grid, action)}
-    }
-    // 💣 the useUpdateGrid hook above will handle this. Delete this case.
-    case 'UPDATE_GRID': {
-      return {...state, grid: updateGridState(state.grid)}
-    }
+    //4-6-d - commenting using recoil instead of reducer
+    // // 💣 we're going to use recoil to update the cell values, so delete this case
+    // case 'UPDATE_GRID_CELL': {
+    //   return {...state, grid: updateGridCellState(state.grid, action)}
+    // }
+    // // 💣 the useUpdateGrid hook above will handle this. Delete this case.
+    // case 'UPDATE_GRID': {
+    //   return {...state, grid: updateGridState(state.grid)}
+    // }
     default: {
       throw new Error(`Unhandled action type: ${action.type}`)
     }
@@ -63,11 +72,12 @@ function appReducer(state, action) {
 function AppProvider({children}) {
   const [state, dispatch] = React.useReducer(appReducer, {
     dogName: '',
-    // 💣 we're moving our state outside of React with our atom, delete this:
-    grid: initialGrid,
+    // 4-6-e- 💣 we're moving our state outside of React with our atom, delete this:
+    // grid: initialGrid,
   })
-  // 🦉 notice that we don't even need to bother memoizing this value
+  // 4-6-f - 🦉 notice that we don't even need to bother memoizing this value
   const value = [state, dispatch]
+
   return (
     <AppStateContext.Provider value={value}>
       {children}
@@ -84,12 +94,17 @@ function useAppState() {
 }
 
 function Grid() {
-  // 🐨 we're no longer storing the grid in our app state, so instead you
+  // 4-6- h- 🐨 we're no longer storing the grid in our app state, so instead you
   // want to get the updateGrid function from useUpdateGrid
+  const updateGrid = useUpdateGrid();
+
   const [, dispatch] = useAppState()
   const [rows, setRows] = useDebouncedState(50)
   const [columns, setColumns] = useDebouncedState(50)
-  const updateGridData = () => dispatch({type: 'UPDATE_GRID'})
+
+  //4-6-i- using updateGrid func
+  // const updateGridData = () => dispatch({type: 'UPDATE_GRID'})
+  const updateGridData = () => updateGrid({rows,columns});
   return (
     <AppGrid
       onUpdateGrid={updateGridData}
@@ -101,16 +116,23 @@ function Grid() {
     />
   )
 }
-// 💣 remove memoization. It's not needed!
-Grid = React.memo(Grid)
+// 4-6-k- 💣 remove memoization. It's not needed!
+// Grid = React.memo(Grid)
 
 function Cell({row, column}) {
   // 🐨 replace these three lines with useRecoilState for the cellAtoms
   // 💰 Here's how you calculate the new value for the cell when it's clicked:
   //    Math.random() * 100
-  const [state, dispatch] = useAppState()
-  const cell = state.grid[row][column]
-  const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
+  
+  // 4-6-L - no need for these
+  // const [state, dispatch] = useAppState()
+  // const cell = state.grid[row][column]
+
+  //4-6- M- change for recoil and change handleChange func
+  const [cell,setCell] = useRecoilState(cellAtoms({row,column}))
+  // const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
+
+  const handleClick = () => setCell(Math.random()*100)
 
   return (
     <button
@@ -125,9 +147,9 @@ function Cell({row, column}) {
     </button>
   )
 }
-// 🦉 notice we don't need to bother memoizing any of the components!!
+// 4-6- j- 🦉 notice we don't need to bother memoizing any of the components!!
 // 💣 remove memoization
-Cell = React.memo(Cell)
+// Cell = React.memo(Cell)
 
 function DogNameInput() {
   const [state, dispatch] = useAppState()
@@ -160,13 +182,15 @@ function App() {
   return (
     <div className="grid-app">
       <button onClick={forceRerender}>force rerender</button>
-      {/* 🐨 wrap this in a RecoilRoot */}
-      <AppProvider>
-        <div>
-          <DogNameInput />
-          <Grid />
-        </div>
-      </AppProvider>
+      {/* 4-6-b- 🐨 wrap this in a RecoilRoot */}
+      <RecoilRoot>
+          <AppProvider>
+            <div>
+              <DogNameInput />
+              <Grid />
+            </div>
+          </AppProvider>
+      </RecoilRoot>
     </div>
   )
 }

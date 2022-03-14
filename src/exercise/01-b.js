@@ -5,26 +5,19 @@ import * as React from 'react'
 // 💣 remove this import
 // import Globe from '../globe'
 
-// 🐨 use React.lazy to create a Globe component which uses a dynamic import
-// to get the Globe component from the '../globe' module.
-const loadGlobe = ()=> import('../globe');
+//use of webpack magic comment we can prefetch once the browser is not 
+//accessing or retreiving any resources
+//there are certain implication to this i.e, 
+//if we are using any other server webpack will give errors here but with 
+//front end apps it will not show errors
+
+                            // Webpack magic comment
+const loadGlobe = React.lazy(/* webpackPrefetch:true*/ '../globe');
 
 
-//3- using same function for accesing the same component
-//so creating a common comp for import component
 
-//1-React lazy - lazily load component need suspense comp 
-//also with fallback component and always default comp are lazily loaded
-// const Globe = React.lazy(()=> import('../globe'));
-
-// 3-changes in Globe func
 const Globe = React.lazy(loadGlobe);
 
-
-// 2-lazily load when user focus or hovers the checkbox 
-// function loadGlobe(){
-//   return import('../globe');
-// }
 
 function App() {
   const [showGlobe, setShowGlobe] = React.useState(false)
@@ -48,7 +41,7 @@ function App() {
         <input
           type="checkbox"
           checked={showGlobe}
-          //2- load when user hover r focus checkbox
+          
           onMouseEnter={loadGlobe}
           onFocus={loadGlobe}
           onChange={e => setShowGlobe(e.target.checked)}

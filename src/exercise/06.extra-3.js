@@ -1,5 +1,15 @@
-// Optimize context value
-// http://localhost:3000/isolated/exercise/05.js
+// Fix "perf death by a thousand cuts"
+// http://localhost:3000/isolated/exercise/06.js
+
+/*
+Here we clicking the grid cels and do the profiling so we're getting cells rerender and button rerenders
+so here the Cell is consuming the state updates and rendering that
+
+we can do something where cell says do update me when there is part of update and not rerender the whole grid cells 
+
+here we can abstract away this part and send updated cell as a prop
+const cell = state.grid[row][column] in the Cell Comp
+*/ 
 
 import * as React from 'react'
 import {
@@ -11,16 +21,9 @@ import {
 } from '../utils'
 
 const AppStateContext = React.createContext()
+const AppDispatchContext = React.createContext()
 
-/*
-The Grid is rerendering when any cell is clicked, so here memo finds that 
-grid comes up with new value since  the whole state waschanges so it returns a new array
-so it changes the whole context which is responsible for grid rerender.
-
-here we can separate the dispatch value from context and memo since it never changes
-*/ 
-//5 - 2a creating the context for dispatch alone
-const AppDispatchContext = React.createContext();
+const DogContext = React.createContext()
 
 const initialGrid = Array.from({length: 100}, () =>
   Array.from({length: 100}, () => Math.random() * 100),
@@ -28,9 +31,6 @@ const initialGrid = Array.from({length: 100}, () =>
 
 function appReducer(state, action) {
   switch (action.type) {
-    case 'TYPED_IN_DOG_INPUT': {
-      return {...state, dogName: action.dogName}
-    }
     case 'UPDATE_GRID_CELL': {
       return {...state, grid: updateGridCellState(state.grid, action)}
     }
@@ -48,24 +48,12 @@ function AppProvider({children}) {
     dogName: '',
     grid: initialGrid,
   })
-  // 🐨 memoize this value with React.useMemo
-  // 5 -1 - useMemo since this array is responsible for rerenders and it is sent 
-  //as new array every time it is rerendered
-  // const value = [state, dispatch]
-
-  // state is variable everytime and dispatch is static everytime but we can import it 
-  //if we want it will be no difference
-  // const value = React.useMemo(()=> [state, dispatch],[state])
-
-  //5-2c- removing this since the values are directly used in providers
-  // const value = React.useMemo(()=> [state, dispatch],[state])
   return (
-    // 5 -2b - adding the app dispatch provider the order of these two provider is not mandatory
-    <AppDispatchContext.Provider value = {dispatch}>
-      <AppStateContext.Provider value={state}>
+    <AppStateContext.Provider value={state}>
+      <AppDispatchContext.Provider value={dispatch}>
         {children}
-      </AppStateContext.Provider>
-    </AppDispatchContext.Provider>
+      </AppDispatchContext.Provider>
+    </AppStateContext.Provider>
   )
 }
 
@@ -76,7 +64,7 @@ function useAppState() {
   }
   return context
 }
-// 5-2d - creating the error and context for appDispatch context
+
 function useAppDispatch() {
   const context = React.useContext(AppDispatchContext)
   if (!context) {
@@ -86,9 +74,32 @@ function useAppDispatch() {
 }
 
 
+function dogReducer(state,action){
+    switch (action.type) {
+        case 'TYPED_IN_DOG_INPUT': {
+          return {...state, dogName: action.dogName}
+        }
+        
+        default: {
+          throw new Error(`Unhandled action type: ${action.type}`)
+        }
+      }
+}
+
+function DogProvider(props){
+    const [state,dispatch] = React.useReducer(dogReducer,{
+        dogName:''
+    });
+    const value = [state,dispatch]
+    return <DogContext.Provider value={value} {...props}/>
+}
+
+function useDogState(){
+    const context = React.useContext(DogContext);
+    if(!context) throw new Error('useDogState must be used within the DogStateProvider');
+    return context;
+}
 function Grid() {
-  // const [, dispatch] = useAppState()
-  // 5 - 2e - making the assignment with appDispatch func
   const dispatch = useAppDispatch()
   const [rows, setRows] = useDebouncedState(50)
   const [columns, setColumns] = useDebouncedState(50)
@@ -106,13 +117,19 @@ function Grid() {
 }
 Grid = React.memo(Grid)
 
-function Cell({row, column}) {
-  // const [state, dispatch] = useAppState()
-
-  //5- 2f removing the dispatch and using AppDispatch context and for state also
-  const state = useAppState()
-  const dispatch = useAppDispatch()
+//6-3a- putting cell = state.grid[row][column] in a new function and sending the cell 
+//value as a prop
+function Cell({row,column}){
+  const state = useAppState();
   const cell = state.grid[row][column]
+  return <CellImpl cell={cell} row={row} column={column}></CellImpl>
+}
+// 6-3b - changing the Cell to CellImpl  and changing the props and comenting the state and cell values
+// function Cell({row, column}) {
+function CellImpl({cell,row, column}) {
+  // const state = useAppState()
+  // const cell = state.grid[row][column]
+  const dispatch = useAppDispatch()
   const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
   return (
     <button
@@ -130,11 +147,7 @@ function Cell({row, column}) {
 Cell = React.memo(Cell)
 
 function DogNameInput() {
-  // const [state, dispatch] = useAppState()
-
-  //5 -2g making separate state,dispatch 
-  const state = useAppState()
-  const dispatch = useAppDispatch()
+    const [state,dispatch] = useDogState();
   const {dogName} = state
 
   function handleChange(event) {
@@ -159,18 +172,21 @@ function DogNameInput() {
     </form>
   )
 }
-
 function App() {
   const forceRerender = useForceRerender()
+  
   return (
+    
     <div className="grid-app">
       <button onClick={forceRerender}>force rerender</button>
-      <AppProvider>
         <div>
+      <DogProvider>
           <DogNameInput />
+      </DogProvider>  
+      <AppProvider>
           <Grid />
-        </div>
       </AppProvider>
+        </div>
     </div>
   )
 }
